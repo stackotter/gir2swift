@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .executable(name: pkgName, targets: [pkgName]),
         .library(name: libTarget, targets: [libTarget]),
+        .plugin(name: "Gir2SwiftPlugin", targets: ["Gir2SwiftPlugin"])
     ],
     dependencies: [ 
         .package(url: "https://github.com/jpsim/Yams.git", from: "4.0.6"),
