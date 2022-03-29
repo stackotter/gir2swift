@@ -14,7 +14,7 @@ import Foundation
 ///   - pkgConfigName: Name of the library to pass to pkg-config
 ///   - outputString: The output string to post-process (if not empty)
 ///   - outputFiles: The output files to post-process
-func postProcess(_ node: String, pkgConfigName: String, outputString: String, outputDirectory: String?, outputFiles: Set<String>) {
+func postProcess(_ node: String, pkgConfigName: String, outputString: String, outputDirectory: String?, outputFiles: Set<String>, configurationDirectory: URL) {
     var pipeCommands = [CommandArguments]()
     let postProcessors = ["sed", "awk"]
     let fm = FileManager.default

@@ -2,14 +2,11 @@
 
 import PackageDescription
 
-let pkgName = "gir2swift"
-let libTarget = "lib\(pkgName)"
-
 let package = Package(
-    name: pkgName,
+    name: "gir2swift",
     products: [
-        .executable(name: pkgName, targets: [pkgName]),
-        .library(name: libTarget, targets: [libTarget]),
+        .executable(name: "gir2swift", targets: ["gir2swift"]),
+        .library(name: "libgir2swift", targets: ["libgir2swift"]),
         .plugin(name: "Gir2SwiftPlugin", targets: ["Gir2SwiftPlugin"])
     ],
     dependencies: [ 
@@ -19,14 +16,13 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: pkgName, 
+            name: "gir2swift",
             dependencies: [
-                .init(stringLiteral: libTarget)
+                "libgir2swift"
             ]
         ),
-        
         .target(
-            name: libTarget,
+            name: "libgir2swift",
             dependencies: [
                 "SwiftLibXML",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
@@ -34,15 +30,12 @@ let package = Package(
             ]
         ),
         
-        .testTarget(
-          name: "\(pkgName)Tests",
-          dependencies: [.init(stringLiteral: libTarget)]
-        ),
+        .plugin(name: "Gir2SwiftPlugin", capability: .buildTool(), dependencies: [.target(name: "gir2swift")]),
         
-        .plugin(
-          name: "Gir2SwiftPlugin",
-          capability: .buildTool(),
-          dependencies: ["gir2swift"]
+        
+        .testTarget(
+            name: "gir2swiftTests",
+            dependencies: ["libgir2swift"]
         )
     ]
 )

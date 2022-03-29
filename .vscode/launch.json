@@ -10,7 +10,28 @@
             "request": "launch",
             "program": "${workspaceFolder}/.build/debug/gir2swift",
             "cwd": "${workspaceFolder}/../SwiftGtk",
-            "args": ["-o", "Sources/Gtk"]
+            "args": [
+                "-o",
+                "Sources/Gtk"
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug gir2swift",
+            "program": "${workspaceFolder:gir2swift}/.build/debug/gir2swift",
+            "args": [],
+            "cwd": "${workspaceFolder:gir2swift}",
+            "preLaunchTask": "swift: Build Debug gir2swift"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Release gir2swift",
+            "program": "${workspaceFolder:gir2swift}/.build/release/gir2swift",
+            "args": [],
+            "cwd": "${workspaceFolder:gir2swift}",
+            "preLaunchTask": "swift: Build Release gir2swift"
         }
     ]
 }

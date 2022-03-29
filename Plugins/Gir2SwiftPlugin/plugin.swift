@@ -1,67 +1,48 @@
 import Foundation
 import PackagePlugin
 
-extension Path {
-    func exists() -> Bool {
-        FileManager.default.fileExists(atPath: string)
-    }
-}
-
 @main struct Gir2SwiftPlugin: BuildToolPlugin {
-    func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        let outputDir = context.pluginWorkDirectory.appending("Generated")
+    func createBuildCommands(context: PluginContext, target: Target) throws -> [Command] {
+        let outputDir = context.pluginWorkDirectory.appending("Gir2SwiftOutputDir")
+        try FileManager.default.createDirectory(atPath: outputDir.string, withIntermediateDirectories: true)
         
-        func packageDirectory(for target: Path) -> Path {
-            var curr = target
-            while !curr.appending("Package.swift").exists() {
-                if curr.stem.isEmpty {
-                    fatalError("Could not find Package.swift for target \(target)")
-                }
-                curr = curr.removingLastComponent()
-            }
-            return curr
+        let suffixes = ["@", "aliases", "bitfields", "callbacks", "constants", "enumerations", "functions", "unions"]
+        var outputFiles = suffixes.map { suffix in
+            outputDir.appending("GLib-2.0-\(suffix).swift")
         }
         
-        let girNames = try target.recursiveTargetDependencies.compactMap { target -> String? in
-            let package = packageDirectory(for: target.directory)
-            let manifest = package.appending("gir2swift-manifest.sh")
-            guard manifest.exists() else { return nil }
-            
-            let pipe = Pipe()
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: manifest.string)
-            proc.arguments = ["gir-name"]
-            proc.standardOutput = pipe
-            try proc.run()
-            
-            return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+        outputFiles.append(contentsOf: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".map { character in
+            outputDir.appending("GLib-2.0-\(character).swift")
+        })
+        
+        outputFiles.append(outputDir.appending("GLib-2.0.swift"))
+        
+        let inputFiles = [
+            "GLib-2.0-2.62.0.awk",
+            "GLib-2.0-2.62.0.sed",
+            "GLib-2.0.awk",
+            "GLib-2.0.blacklist",
+            "GLib-2.0.module",
+            "GLib-2.0.override",
+            "GLib-2.0.preamble",
+            "GLib-2.0.sed",
+            "GLib-2.0.verbatim",
+            "GLib-2.0<=2.60.0.sed",
+            "gir2swift-manifest.yaml"
+        ].map {
+            context.package.directory.appending($0)
         }
         
-        let girSearchPaths: [Path] = ["/opt/homebrew/share/gir-1.0", "/usr/local/share/gir-1.0", "/usr/share/gir-1.0"].map(Path.init)
-        guard let girPath = girSearchPaths.first(where: { searchPath in
-            girNames.allSatisfy { gir in searchPath.appending("\(gir).gir").exists() }
-        }) else {
-            fatalError("Could not locate GIR path")
-        }
-        
-        return [.prebuildCommand(
+        return [.buildCommand(
             displayName: "Running gir2swift",
-            executable: context.package.directory.appending("gir2swift-manifest.sh"),
+            executable: try context.tool(named: "gir2swift").path,
             arguments: [
-                "generate",
-                // packagePath
-                context.package.directory.string,
-                // g2s_exec
-                try context.tool(named: "gir2swift").path.string,
-                // gir_pre
-                girNames.dropFirst().joined(separator: " "),
-                // gir_path
-                girPath.string,
-                // output_dir
-                outputDir.string
+                "-o", outputDir.string,
+                "--configuration-directory", context.package.directory,
+                "--alpha-names"
             ],
-            outputFilesDirectory: outputDir
+            inputFiles: inputFiles,
+            outputFiles: outputFiles
         )]
     }
 }

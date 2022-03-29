@@ -55,15 +55,14 @@ public struct Gir2Swift: ParsableCommand {
     /// File containing one-off boilerplate code for your module
     @Option(name: .short, help: "Add the given .swift file as the main (hand-crafted) Swift file for your library target.")
     var moduleBoilerPlateFile: String = ""
-
-    /// By default, the gir2swift searches for manifest in the work directory. As for now, the search can't be sidabled.
-    @Option(name: .long, help: "Custom path to manifest.")
-    var manifest: String = "gir2swift-manifest.yaml"
+    
+    /// The directory of the
+    @Option(name: .long, help: "The directory containing the manifest and otehr configuration files. By default the current work directory is used.")
+    var configurationDirectory: String?
 
     /// The actual, main `.gir` file(s) to process
     @Argument(help: "The .gir metadata files to process. Gir files specified in CLI are merged with those specified in the manifest.")
     var girFiles: [String] = []
-
 
     /// Designated initialiser
     public init() {}
@@ -87,26 +86,24 @@ public struct Gir2Swift: ParsableCommand {
 
         // This variable is a dead store
         var pkgConfig = pkgConfigName
-
+        
+        FileManager.default.changeCurrentDirectoryPath(configurationDirectory ?? ".")
+        let configurationDirectory = URL(fileURLWithPath: configurationDirectory ?? ".")
         let manifestPlan: Plan?
-        if let wd = getcwd() {
-            let manifestURL = URL(fileURLWithPath: wd).appendingPathComponent(manifest)
-            do {
-                let plan = try Plan(using: manifestURL)
-                girsToPreload.formUnion(plan.girFilesToPreload.map(\.path))
-                girFilesToGenerate.insert(plan.girFileToGenerate.path)
-                pkgConfig = pkgConfig ?? plan.pkgConfigName
-                for ns in plan.namespaces {
-                    guard !namespace.contains(ns) else { continue }
-                    namespace.append(ns)
-                }
-                manifestPlan = plan
-            } catch {
-                manifestPlan = nil
-                print("Failed to load \(girFilesToGenerate.map { ($0.split(separator: "/").last ?? "").split(separator: ".").first ?? "" }.joined(separator: ", ")) manifest\(girFilesToGenerate.count > 1 ? "s" : ""):\n    \(error)", to: &Streams.stdErr)
+        let manifestURL = configurationDirectory.appendingPathComponent("gir2swift-manifest.yaml")
+        do {
+            let plan = try Plan(using: manifestURL)
+            girsToPreload.formUnion(plan.girFilesToPreload.map(\.path))
+            girFilesToGenerate.insert(plan.girFileToGenerate.path)
+            pkgConfig = pkgConfig ?? plan.pkgConfigName
+            for ns in plan.namespaces {
+                guard !namespace.contains(ns) else { continue }
+                namespace.append(ns)
             }
-        } else {
+            manifestPlan = plan
+        } catch {
             manifestPlan = nil
+            print("Failed to load \(girFilesToGenerate.map { ($0.split(separator: "/").last ?? "").split(separator: ".").first ?? "" }.joined(separator: ", ")) manifest\(girFilesToGenerate.count > 1 ? "s" : ""):\n    \(error)", to: &Streams.stdErr)
         }
 
         // pre-load gir files to ensure pre-requisite types are known
@@ -117,7 +114,7 @@ public struct Gir2Swift: ParsableCommand {
         let target = outputDirectory.isEmpty ? manifestPlan?.outputDirectory : outputDirectory
         let generateAlphaFiles = alphaNames || manifestPlan?.useAlphaNames ?? false
         for girFile in girFilesToGenerate {
-            process_gir(file: girFile, boilerPlate: moduleBoilerPlate, to: target, split: singleFilePerClass, generateAll: allFilesGenerate, useAlphaNames: generateAlphaFiles, postProcess: postProcess + (manifestPlan?.postProcess ?? []))
+            process_gir(file: girFile, boilerPlate: moduleBoilerPlate, to: target, split: singleFilePerClass, generateAll: allFilesGenerate, useAlphaNames: generateAlphaFiles, postProcess: postProcess + (manifestPlan?.postProcess ?? []), configurationDirectory: configurationDirectory)
         }
 
         if verbose {

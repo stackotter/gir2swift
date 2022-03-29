@@ -33,49 +33,57 @@ private func load_gir(_ file: String, quiet q: Bool = false, process: (GIR) -> V
 }
 
 /// process blacklist and verbatim constants information
-private func processSpecialCases(_ gir: GIR, forFile node: String) {
-    let preamble = node + ".preamble"
-    gir.preamble = (try? String(contentsOfFile: preamble)) ?? ""
-    let blacklist = node + ".blacklist"
-    GIR.blacklist = (try? String(contentsOfFile: blacklist)).flatMap { Set($0.nonEmptyComponents(separatedBy: "\n")) } ?? []
-    let verbatimConstants = node + ".verbatim"
-    GIR.verbatimConstants = (try? String(contentsOfFile: verbatimConstants)).flatMap { Set($0.nonEmptyComponents(separatedBy: "\n")) } ?? []
-    let overrideFile = node + ".override"
-    GIR.overrides = (try? String(contentsOfFile: overrideFile)).flatMap { Set($0.nonEmptyComponents(separatedBy: "\n")) } ?? []
+private func processSpecialCases(_ gir: GIR, forFile node: String, configurationDirectory: URL) {
+    let preamble = configurationDirectory.appendingPathComponent(node + ".preamble")
+    gir.preamble = (try? String(contentsOf: preamble)) ?? ""
+    let blacklist = configurationDirectory.appendingPathComponent(node + ".blacklist")
+    GIR.blacklist = (try? String(contentsOf: blacklist)).flatMap { Set($0.nonEmptyComponents(separatedBy: "\n")) } ?? []
+    let verbatimConstants = configurationDirectory.appendingPathComponent(node + ".verbatim")
+    GIR.verbatimConstants = (try? String(contentsOf: verbatimConstants)).flatMap { Set($0.nonEmptyComponents(separatedBy: "\n")) } ?? []
+    let overrideFile = configurationDirectory.appendingPathComponent(node + ".override")
+    GIR.overrides = (try? String(contentsOf: overrideFile)).flatMap { Set($0.nonEmptyComponents(separatedBy: "\n")) } ?? []
 }
 
 extension Gir2Swift {
-
     /// pre-load a GIR without processing, but adding to known types / records
     func preload_gir(file: String) {
         load_gir(file, quiet: true)
     }
 
     /// process a GIR file
-    func process_gir(file: String, boilerPlate: String, to outputDirectory: String? = nil, split singleFilePerClass: Bool = false, generateAll: Bool = false, useAlphaNames: Bool = false, postProcess: [String]) {
+    func process_gir(
+        file: String,
+        boilerPlate: String,
+        to outputDirectory: String? = nil,
+        split singleFilePerClass: Bool = false,
+        generateAll: Bool = false,
+        useAlphaNames: Bool = false,
+        postProcess: [String],
+        configurationDirectory: URL
+    ) {
         let node = file.components(separatedBy: "/").last?.stringByRemoving(suffix: ".gir") ?? file
         let modulePrefix: String
         if boilerPlate.isEmpty {
-            let bpfile = node + ".module"
-            modulePrefix = (try? String(contentsOfFile: bpfile)) ?? boilerPlate
+            let bpfile = configurationDirectory.appendingPathComponent(node + ".module")
+            modulePrefix = (try? String(contentsOf: bpfile)) ?? boilerPlate
         } else {
             modulePrefix = boilerPlate
         }
         let pkgConfigArg = pkgConfigName ?? node.lowercased()
-        let wlfile = node + ".whitelist"
-        if let whitelist = (try? String(contentsOfFile: wlfile)).flatMap({ Set($0.nonEmptyComponents(separatedBy: "\n")) }) {
+        let wlfile = configurationDirectory.appendingPathComponent(node + ".whitelist")
+        if let whitelist = (try? String(contentsOf: wlfile)).flatMap({ Set($0.nonEmptyComponents(separatedBy: "\n")) }) {
             for name in whitelist {
                 GIR.knownDataTypes.removeValue(forKey: name)
                 GIR.knownRecords.removeValue(forKey: name)
                 GIR.KnownFunctions.removeValue(forKey: name)
             }
         }
-        let escfile = node + ".callbackSuffixes"
-        GIR.callbackSuffixes = (try? String(contentsOfFile: escfile))?.nonEmptyComponents(separatedBy: "\n") ?? [
+        let escfile = configurationDirectory.appendingPathComponent(node + ".callbackSuffixes")
+        GIR.callbackSuffixes = (try? String(contentsOf: escfile))?.nonEmptyComponents(separatedBy: "\n") ?? [
             "Notify", "Func", "Marshaller", "Callback"
         ]
-        let nsfile = node + ".namespaceReplacements"
-        if let ns = (try? String(contentsOfFile: nsfile)).flatMap({Set($0.nonEmptyComponents(separatedBy: "\n"))}) {
+        let nsfile = configurationDirectory.appendingPathComponent(node + ".namespaceReplacements")
+        if let ns = (try? String(contentsOf: nsfile)).flatMap({Set($0.nonEmptyComponents(separatedBy: "\n"))}) {
             for line in ns {
                 let keyValues: [Substring]
                 let tabbedKeyValues: [Substring] = line.split(separator: "\t")
@@ -95,7 +103,7 @@ extension Gir2Swift {
         var outputString = ""
 
         load_gir(file) { gir in
-            processSpecialCases(gir, forFile: node)
+            processSpecialCases(gir, forFile: node, configurationDirectory: configurationDirectory)
             let blacklist = GIR.blacklist
             let boilerplate = gir.boilerPlate
             let preamble = gir.preamble
@@ -327,7 +335,7 @@ extension Gir2Swift {
                 }
             }
             queues.wait()
-            libgir2swift.postProcess(node, pkgConfigName: pkgConfigArg, outputString: outputString, outputDirectory: outputDirectory, outputFiles: outputFiles)
+            libgir2swift.postProcess(node, pkgConfigName: pkgConfigArg, outputString: outputString, outputDirectory: outputDirectory, outputFiles: outputFiles, configurationDirectory: configurationDirectory)
             if verbose {
                 let pf = outputString.isEmpty ? "** " : "// "
                 let nl = outputString.isEmpty ? "\n"  : "\n// "
