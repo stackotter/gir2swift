@@ -133,7 +133,7 @@ extension Gir2Swift {
                 }
             }
             func writebg(queue: DispatchQueue = background, _ string: String, to fileName: String, append doAppend: Bool = false) {
-                queue.async(group: queues) { write(string, to: fileName) }
+                queue.async(group: queues) { write(string, to: fileName, append: doAppend) }
             }
             func write<T: GIR.Record>(_ types: [T], using ptrconvert: (String) -> (GIR.Record) -> String) {
                 if let dir = outputDirectory {
@@ -144,6 +144,7 @@ extension Gir2Swift {
                     var name = ""
                     var alphaq = background
                     for type in types {
+                        print(type.swift)
                         let convert = ptrconvert(type.ptrName)
                         let code = convert(type)
                         
@@ -152,17 +153,7 @@ extension Gir2Swift {
                         guard let firstChar = name.first else { continue }
                         let f: String
                         if useAlphaNames {
-                            name = firstChar.isASCII && firstChar.isLetter ? type.className.upperInitial : "@"
-                            guard first != nil && first != firstChar else {
-                                if first == nil {
-                                    first = firstChar
-                                    firstName = name
-                                    let i = Int((name.utf8.first ?? atChar) - atChar)
-                                    alphaq = alphaQueues[i]
-                                }
-                                continue
-                            }
-                            f = "\(dir)/\(node)-\(firstName).swift"
+                            f = "\(dir)/\(node)-A.swift"
                         } else {
                             guard singleFilePerClass || ( first != nil && first != firstChar ) else {
                                 if first == nil {
@@ -173,20 +164,18 @@ extension Gir2Swift {
                             }
                             f = "\(dir)/\(node)-\(firstName)\(name).swift"
                         }
-                        writebg(queue: alphaq, output, to: f, append: alphaNames)
+                        writebg(queue: outq, output, to: f, append: useAlphaNames)
                         output = ""
                         first = nil
                     }
                     if first != nil {
                         let f: String
                         if useAlphaNames {
-                            let i = Int((name.utf8.first ?? atChar) - atChar)
-                            alphaq = alphaQueues[i]
-                            f = "\(dir)/\(node)-\(firstName).swift"
+                            f = "\(dir)/\(node)-A.swift"
                         } else {
                             f = "\(dir)/\(node)-\(firstName)\(name).swift"
                         }
-                        writebg(queue: alphaq, output, to: f, append: alphaNames)
+                        writebg(queue: outq, output, to: f, append: useAlphaNames)
                     }
                 } else {
                     let code = types.map { type in
@@ -200,7 +189,7 @@ extension Gir2Swift {
             if let dir = outputDirectory {
                 DispatchQueue.concurrentPerform(iterations: 27) { i in
                     let ascii = atChar + UInt8(i)
-                    let f = "\(dir)/\(node)-\(Character(UnicodeScalar(ascii))).swift"
+                    let f = "\(dir)/\(node)-A.swift"
                     try? fileManager.removeItem(atPath: f)
                     if alphaNames {
                         try? preamble.write(toFile: f, atomically: true, encoding: .utf8)
@@ -256,6 +245,7 @@ extension Gir2Swift {
             background.async(group: queues) {
                 let convert = swiftCode(gir.functions)
                 let types = gir.interfaces.filter {!blacklist.contains($0.name)}
+                print(types.map(\.swift))
                 write(types, using: convert)
             }
             background.async(group: queues) {
@@ -269,6 +259,7 @@ extension Gir2Swift {
                      } != true
                     )
                 }
+                print(records.map(\.swift))
                 write(records, using: convert)
             }
             background.async(group: queues) {

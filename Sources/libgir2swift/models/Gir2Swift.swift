@@ -110,6 +110,8 @@ public struct Gir2Swift: ParsableCommand {
         for girFile in girsToPreload {
             preload_gir(file: girFile)
         }
+        
+        print("Known data type: \(GIR.knownDataTypes)")
 
         let target = outputDirectory.isEmpty ? manifestPlan?.outputDirectory : outputDirectory
         let generateAlphaFiles = alphaNames || manifestPlan?.useAlphaNames ?? false
